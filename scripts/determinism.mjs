@@ -38,7 +38,7 @@ function runFixed(frameMs, seconds = 5) {
   return { ship, simSteps };
 }
 
-const fmt = (s) => `x=${s.x.toFixed(3)} y=${s.y.toFixed(3)}`;
+const fmt = (s) => `x=${s.pos.x.toFixed(3)} y=${s.pos.y.toFixed(3)}`;
 
 console.log("Holding thrust for 5 s of simulated time, arena 1920x1080\n");
 console.log("VARIABLE timestep (simulate(dt) once per frame):");

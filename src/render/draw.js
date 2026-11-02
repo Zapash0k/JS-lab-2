@@ -47,10 +47,19 @@ export function drawBackground(ctx, w, h, stars) {
 }
 
 // The ship is drawn at the origin pointing right (+x); the canvas is moved/rotated.
-export function drawShip(ctx, { x, y, angle, thrust }) {
+export function drawShip(ctx, { x, y, angle, thrust, shield = false, blink = false }) {
+  if (blink) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
+
+  if (shield) {
+    ctx.strokeStyle = "rgba(106, 255, 200, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   if (thrust) {
     ctx.fillStyle = "#ff9d2e";
@@ -75,6 +84,86 @@ export function drawShip(ctx, { x, y, angle, thrust }) {
   ctx.stroke();
 
   ctx.restore();
+}
+
+// Interpolated draw state of an entity; skips an axis that wrapped this step.
+function drawState(e, alpha, size) {
+  const wrappedX = Math.abs(e.pos.x - e.prevPos.x) > size.w / 2;
+  const wrappedY = Math.abs(e.pos.y - e.prevPos.y) > size.h / 2;
+  return {
+    x: wrappedX ? e.pos.x : lerp(e.prevPos.x, e.pos.x, alpha),
+    y: wrappedY ? e.pos.y : lerp(e.prevPos.y, e.pos.y, alpha),
+    angle: lerpAngle(e.prevAngle, e.angle, alpha),
+  };
+}
+
+function drawBullet(ctx, { x, y }, e) {
+  ctx.fillStyle = e.behaviors.length ? "#6affc8" : "#ffe066";
+  ctx.beginPath();
+  ctx.arc(x, y, e.radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawAsteroid(ctx, { x, y, angle }, e) {
+  const hunter = e.behaviors.some((b) => b.name === "homing");
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.strokeStyle = hunter ? "#ff6a6a" : "#9aa7bd";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  e.shape.forEach((k, i) => {
+    const a = (i / e.shape.length) * Math.PI * 2;
+    const px = Math.cos(a) * e.radius * k;
+    const py = Math.sin(a) * e.radius * k;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+const PICKUP_COLOR = { shield: "#6affc8", rapid: "#ffe066", homing: "#ff8cf0" };
+
+function drawPickup(ctx, { x, y }, e) {
+  ctx.strokeStyle = PICKUP_COLOR[e.effect];
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, e.radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = PICKUP_COLOR[e.effect];
+  ctx.font = "bold 12px ui-monospace, Consolas, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(e.effect[0].toUpperCase(), x, y + 1);
+  ctx.textAlign = "start";
+}
+
+function drawExplosion(ctx, e, duration) {
+  ctx.fillStyle = `rgba(255, 170, 60, ${Math.max(0, e.ttl / duration)})`;
+  for (const p of e.particles) ctx.fillRect(p.pos.x - 1.5, p.pos.y - 1.5, 3, 3);
+}
+
+export function drawWorld(ctx, world, alpha, size) {
+  for (const e of world) {
+    if (!e.alive) continue;
+    if (e.kind === "explosion") {
+      drawExplosion(ctx, e, e.constructor.DURATION);
+      continue;
+    }
+    const d = drawState(e, alpha, size);
+    if (e.kind === "ship") {
+      drawShip(ctx, {
+        ...d,
+        thrust: e.thrust,
+        shield: e.shield > 0,
+        blink: e.invuln > 0 && Math.floor(e.invuln * 10) % 2 === 0,
+      });
+    } else if (e.kind === "bullet") drawBullet(ctx, d, e);
+    else if (e.kind === "asteroid") drawAsteroid(ctx, d, e);
+    else if (e.kind === "pickup") drawPickup(ctx, d, e);
+  }
 }
 
 export function drawHud(ctx, stats, extra = []) {

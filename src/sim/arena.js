@@ -1,9 +1,24 @@
-// Wrap-around arena. Returns true if the ship crossed an edge this call.
-export function wrap(ship, width, height) {
-  const x = ((ship.x % width) + width) % width;
-  const y = ((ship.y % height) + height) % height;
-  const wrapped = x !== ship.x || y !== ship.y;
-  ship.x = x;
-  ship.y = y;
+import { Vector2 } from "./vector.js";
+
+// Wrap-around arena. Returns true if the entity crossed an edge this call.
+export function wrap(e, width, height) {
+  const x = ((e.pos.x % width) + width) % width;
+  const y = ((e.pos.y % height) + height) % height;
+  const wrapped = x !== e.pos.x || y !== e.pos.y;
+  if (wrapped) e.pos = new Vector2(x, y);
   return wrapped;
+}
+
+// Bounce off the arena walls (asteroids).
+export function bounce(e, width, height) {
+  const r = e.radius;
+  let { x, y } = e.vel;
+  if ((e.pos.x < r && x < 0) || (e.pos.x > width - r && x > 0)) x = -x;
+  if ((e.pos.y < r && y < 0) || (e.pos.y > height - r && y > 0)) y = -y;
+  if (x !== e.vel.x || y !== e.vel.y) e.vel = new Vector2(x, y);
+}
+
+export function contain(e, width, height) {
+  if (e.edge === "wrap") wrap(e, width, height);
+  else if (e.edge === "bounce") bounce(e, width, height);
 }
